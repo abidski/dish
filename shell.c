@@ -3,10 +3,31 @@
 #include <stdlib.h>
 #include <string.h>
 
+void exec(char **args) {
+
+	pid_t pid = fork();
+	pid_t wpid;
+	int status;
+	if (pid == 0) {
+		if (execvp(args[0], args) == -1) {
+			perror("exec");
+		}
+		exit(EXIT_FAILURE);
+
+	} else if (pid > 0) {
+		// Parent process
+		do {
+			wpid = waitpid(pid, &status, WUNTRACED);
+		} while (!WIFEXITED(status) && !WIFSIGNALED(status));
+	} else {
+		perror("dish");
+	}
+}
+
 char **parse(char *input) {
 	int tok_bufsize = TOK_BUFSIZE;
 	char **args = malloc(TOK_BUFSIZE * sizeof(char *));
-	char *token = strtok(input, " ");
+	char *token = strtok(input, TOK_DELIM);
 	int index = 0;
 	while (token != NULL) {
 		if (index > tok_bufsize) {
@@ -48,6 +69,7 @@ char *readline() {
 	buffer[i] = '\0';
 	return buffer;
 }
+
 void dish() {
 
 	char *input;
@@ -65,6 +87,7 @@ void dish() {
 	*/
 
 	// exec
+	exec(args);
 }
 int main(int argc, char *argv[]) {
 
