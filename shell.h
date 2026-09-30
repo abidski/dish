@@ -14,7 +14,10 @@
 void dish();
 char * readline(void);
 char ** parse(char* );
-void exec (char **);
+int exec (char **);
+int run (char **);
+int cd (char **);
+int num_builtins();
 
 
 

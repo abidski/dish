@@ -3,7 +3,33 @@
 #include <stdlib.h>
 #include <string.h>
 
-void exec(char **args) {
+char *builtins[] = {"cd"};
+int (*builtins_func[])(char **) = {&cd};
+
+int num_builtins() { return sizeof(builtins) / sizeof(char *); }
+int cd(char **args) {
+
+	if (args[1] == NULL) {
+		fprintf(stderr, "expected argument to \"cd\"\n");
+	}
+
+	int res = chdir(args[1]);
+	if (res != 0) {
+		perror("dish");
+	}
+	return 1;
+}
+int run(char **args) {
+
+	for (int i = 0; i < num_builtins(); i++) {
+		if (strcmp(args[0], builtins[i]) == 0) {
+			return (*builtins_func[i])(args);
+		}
+	}
+	return exec(args);
+}
+
+int exec(char **args) {
 
 	pid_t pid = fork();
 	pid_t wpid;
@@ -22,6 +48,7 @@ void exec(char **args) {
 	} else {
 		perror("dish");
 	}
+	return 1;
 }
 
 char **parse(char *input) {
@@ -75,20 +102,16 @@ void dish() {
 	char *input;
 	char **args;
 
-	// get input
 	input = readline();
 
-	// parse input
 	args = parse(input);
-	/*
-	for (int i = 0; args[i] != NULL; i++) {
-		printf("args[%d] = %s\n", i, args[i]);
-	}
-	*/
 
-	// exec
-	exec(args);
+	run(args);
+
+	free(input);
+	free(args);
 }
+
 int main(int argc, char *argv[]) {
 
 	while (1) {
