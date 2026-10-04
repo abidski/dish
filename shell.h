@@ -13,11 +13,12 @@
 
 void dish();
 char * readline(void);
-char ** parse(char* );
+char ** parse(char*,int * num );
 int exec (char **);
 int run (char **);
 int cd (char **);
 int num_builtins();
+int handle_pipe(char **, int * num);
 
 
 
