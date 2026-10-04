@@ -64,72 +64,69 @@ int handle_pipe(char** args, int* size) {
 	int splits_found = 0;
 	char* pipe_output;
 
+	// Splits output
+	char* output = NULL;
+	char buf[256];
+	ssize_t prev_size = 0;
+	ssize_t n;
+	int split_index = 0;
+
 	for (int i = 0; i < *size; i++) {
 
 		if (strcmp(args[i], "|") == 0) {
 			splits_found += 1;
 			pipes = realloc(pipes, splits_found * sizeof(int));
 			pipes[i - 1] = i;
-
-			int fd[2];
-			int status;
-			pid_t wpid;
-			pid_t pid;
-
-			if (pipe(fd) == -1) {
-				perror("dish");
-			}
-
-			pid = fork();
-
-			if (splits_found <= 1) {
-				if (pid == 0) {
-					dup2(fd[1], STDOUT_FILENO);
-					close(fd[0]);
-					close(fd[1]);
-					execvp(commands[splits_found - 1][0], commands[splits_found - 1]);
-				} else if (pid > 0) {
-					close(fd[1]);
-					close(fd[0]);
-
-					do {
-						wpid = waitpid(pid, &status, WUNTRACED);
-					} while (!WIFEXITED(status) && !WIFSIGNALED(status));
-
-					char* output;
-					char buf[256];
-					ssize_t prev_size;
-					ssize_t n;
-					while ((n = read(fd[0], buf, sizeof buf)) > 0) {
-
-						output = realloc(output, n + prev_size);
-						memcpy(output + n + prev_size, buf, n);
-						prev_size += n;
-					}
-				}
-				continue;
-			} else {
-
-				if (pid == 0) {
-					dup2(fd[1], STDOUT_FILENO);
-					close(fd[0]);
-					close(fd[1]);
-					execvp(commands[splits_found - 1][0], commands[splits_found - 1]);
-				} else if (pid > 0) {
-					close(fd[1]);
-					close(fd[0]);
-
-					do {
-						wpid = waitpid(pid, &status, WUNTRACED);
-					} while (!WIFEXITED(status) && !WIFSIGNALED(status));
-				}
-				continue;
-			}
+			split_index = 0;
+			continue;
 		}
-		commands[splits_found][i] = args[i];
+		commands[splits_found][split_index] = args[i];
+		//		printf("%s ", commands[splits_found][split_index]);
+		//		printf("%d %d\n", splits_found, split_index);
+		split_index++;
 	}
 	if (splits_found == 0) {
 		return 1;
+	} else {
+		exec_pip(commands, splits_found, split_index, splits_found);
+	}
+	return 0;
+}
+
+int exec_pip(char*** commands, int first_size, int second_size, int splits_found) {
+
+	int fd[2];
+	int status;
+	pid_t wpid;
+	pid_t pid1;
+	pid_t pid2;
+
+	if (pipe(fd) == -1) {
+		perror("dish");
+	}
+
+	for (int i = 0; i < splits_found; i++) {
+		pid1 = fork();
+
+		if (pid1 == 0) {
+			dup2(fd[1], STDOUT_FILENO);
+			close(fd[0]);
+			close(fd[1]);
+			execvp(commands[i][0], commands[i]);
+		}
+
+		pid2 = fork();
+
+		if (pid2 == 0) {
+			dup2(fd[0], STDIN_FILENO);
+			close(fd[0]);
+			close(fd[1]);
+			execvp(commands[i + 1][0], commands[i + 1]);
+		}
+		close(fd[1]);
+		close(fd[0]);
+		waitpid(pid1, NULL, 0);
+		waitpid(pid2, NULL, 0);
 	}
 	return 0;
 }
