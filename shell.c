@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 char* builtins[] = { "cd" };
@@ -88,7 +89,7 @@ int handle_pipe(char** args, int* size) {
 	if (splits_found == 0) {
 		return 1;
 	} else {
-		exec_pip(commands, splits_found, split_index, splits_found);
+		exec_pip(commands, splits_found + 1, split_index, splits_found);
 	}
 	return 0;
 }
@@ -96,37 +97,58 @@ int handle_pipe(char** args, int* size) {
 int exec_pip(char*** commands, int first_size, int second_size, int splits_found) {
 
 	int fd[2];
-	int status;
-	pid_t wpid;
-	pid_t pid1;
-	pid_t pid2;
+	int prev_read = -1;
 
-	if (pipe(fd) == -1) {
+	int status;
+
+	pid_t wpid;
+	pid_t pid;
+	pid_t pids[first_size];
+
+	if (pipe(fd) != 0) {
 		perror("dish");
 	}
 
-	for (int i = 0; i < splits_found; i++) {
-		pid1 = fork();
+	for (int i = 0; i < first_size; i++) {
 
-		if (pid1 == 0) {
-			dup2(fd[1], STDOUT_FILENO);
+		if (pipe(fd) != 0) {
+			perror("dish");
+		}
+
+		pid = fork();
+
+		if (pid == 0) {
+			if (i == 0) {
+				dup2(fd[1], STDOUT_FILENO);
+			} else if (i == first_size - 1) {
+				dup2(prev_read, STDIN_FILENO);
+			} else {
+
+				dup2(prev_read, STDIN_FILENO);
+				dup2(fd[1], STDOUT_FILENO);
+			}
+
 			close(fd[0]);
 			close(fd[1]);
 			execvp(commands[i][0], commands[i]);
 		}
+		if (prev_read != -1) {
+			close(prev_read);
+		}
 
-		pid2 = fork();
-
-		if (pid2 == 0) {
-			dup2(fd[0], STDIN_FILENO);
+		if (i != first_size - 1) {
+			prev_read = fd[0];
+			close(fd[1]);
+		} else {
 			close(fd[0]);
 			close(fd[1]);
-			execvp(commands[i + 1][0], commands[i + 1]);
 		}
-		close(fd[1]);
-		close(fd[0]);
-		waitpid(pid1, NULL, 0);
-		waitpid(pid2, NULL, 0);
+		pids[i] = pid;
+	}
+	close(fd[0]);
+	close(fd[1]);
+	for (int i = 0; i < first_size; i++) {
+		waitpid(pids[i], NULL, 0);
 	}
 	return 0;
 }
