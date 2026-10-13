@@ -9,6 +9,7 @@ char* builtins[] = { "cd" };
 int (*builtins_func[])(char**) = { &cd };
 
 int num_builtins() { return sizeof(builtins) / sizeof(char*); }
+
 int cd(char** args) {
 
 	if (args[1] == NULL) {
@@ -54,7 +55,7 @@ int exec(char** args) {
 	return 1;
 }
 
-int handle_pipe(char** args, int* size) {
+int handle_delim(char** args, int* size, char* delim) {
 
 	char*** commands = malloc(*size * sizeof(char**));
 	for (int k = 0; k < *size; k++) {
@@ -74,7 +75,7 @@ int handle_pipe(char** args, int* size) {
 
 	for (int i = 0; i < *size; i++) {
 
-		if (strcmp(args[i], "|") == 0) {
+		if (strcmp(args[i], delim) == 0) {
 			splits_found += 1;
 			pipes = realloc(pipes, splits_found * sizeof(int));
 			pipes[i - 1] = i;
@@ -87,11 +88,11 @@ int handle_pipe(char** args, int* size) {
 		split_index++;
 	}
 	if (splits_found == 0) {
-		return 1;
-	} else {
+		return 0;
+	} else if (*delim == '|') {
 		exec_pip(commands, splits_found + 1, split_index, splits_found);
 	}
-	return 0;
+	return 1;
 }
 
 int exec_pip(char*** commands, int first_size, int second_size, int splits_found) {
@@ -212,10 +213,10 @@ void dish() {
 
 	args = parse(input, &args_num);
 
-	if (handle_pipe(args, &args_num) == 1) {
+	if (handle_delim(args, &args_num, "|") == 0) {
 		run(args);
+	} else if (handle_delim(args, &args_num, ">") || handle_delim(args, &args_num, ">>") || handle_delim(args, &args_num, "<") || handle_delim(args, &args_num, "<<")) {
 	}
-
 	free(input);
 	free(args);
 }

@@ -18,7 +18,7 @@ int exec (char **);
 int run (char **);
 int cd (char **);
 int num_builtins();
-int handle_pipe(char **, int * num);
+int handle_pipe(char **, int * num, char *delim);
 int exec_pip(char*** commands, int first_size, int second_size, int splits_found);
 
 
